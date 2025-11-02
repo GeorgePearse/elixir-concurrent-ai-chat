@@ -9,7 +9,9 @@ defmodule ConcurrentAiChat.Conversation do
   use GenServer
   require Logger
 
-  defstruct [:id, :messages, :model, :created_at, :last_active]
+  alias ConcurrentAiChat.Clients.OpenRouter
+
+  defstruct [:id, :messages, :model, :created_at, :last_active, :use_mock]
 
   ## Client API
 
@@ -47,17 +49,19 @@ defmodule ConcurrentAiChat.Conversation do
   @impl true
   def init(opts) do
     id = Keyword.fetch!(opts, :id)
-    model = Keyword.get(opts, :model, "gpt-3.5-turbo")
+    model = Keyword.get(opts, :model, Application.get_env(:concurrent_ai_chat, :default_model, "deepseek/deepseek-chat"))
+    use_mock = Keyword.get(opts, :use_mock, false)
 
     state = %__MODULE__{
       id: id,
       messages: [],
       model: model,
       created_at: DateTime.utc_now(),
-      last_active: DateTime.utc_now()
+      last_active: DateTime.utc_now(),
+      use_mock: use_mock
     }
 
-    Logger.info("Started conversation #{id}")
+    Logger.info("Started conversation #{id} with model #{model}")
     {:ok, state}
   end
 
@@ -66,18 +70,28 @@ defmodule ConcurrentAiChat.Conversation do
     # Add user message to history
     messages = state.messages ++ [%{role: "user", content: user_message}]
 
-    # TODO: Make actual API call to AI service
-    # For now, simulate with a simple response
-    ai_response = simulate_ai_response(user_message, state.id)
+    # Get AI response - either from OpenRouter or mock
+    result = if state.use_mock do
+      {:ok, simulate_ai_response(user_message, state.id)}
+    else
+      get_ai_response(messages, state.model)
+    end
 
-    updated_messages = messages ++ [%{role: "assistant", content: ai_response}]
+    case result do
+      {:ok, ai_response} ->
+        updated_messages = messages ++ [%{role: "assistant", content: ai_response}]
 
-    new_state = %{state |
-      messages: updated_messages,
-      last_active: DateTime.utc_now()
-    }
+        new_state = %{state |
+          messages: updated_messages,
+          last_active: DateTime.utc_now()
+        }
 
-    {:reply, {:ok, ai_response}, new_state}
+        {:reply, {:ok, ai_response}, new_state}
+
+      {:error, reason} ->
+        Logger.error("AI response failed for conversation #{state.id}: #{inspect(reason)}")
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
@@ -103,10 +117,14 @@ defmodule ConcurrentAiChat.Conversation do
     {:via, Registry, {ConcurrentAiChat.ConversationRegistry, id}}
   end
 
+  defp get_ai_response(messages, model) do
+    OpenRouter.chat_completion(messages, model: model)
+  end
+
   defp simulate_ai_response(message, conversation_id) do
     # Simulate processing time
     Process.sleep(:rand.uniform(100))
 
-    "Response from conversation #{conversation_id}: You said '#{message}'"
+    "Mock response from conversation #{conversation_id}: You said '#{message}'"
   end
 end

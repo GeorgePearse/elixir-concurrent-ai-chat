@@ -41,15 +41,67 @@ Application
    # or visit https://elixir-lang.org/install.html
    ```
 
-2. Install dependencies:
+2. Clone and set up the project:
    ```bash
+   git clone https://github.com/GeorgePearse/elixir-concurrent-ai-chat.git
+   cd elixir-concurrent-ai-chat
    mix deps.get
    ```
 
-3. Set up your AI API key (e.g., OpenAI):
+3. Set up your OpenRouter API key:
    ```bash
-   export OPENAI_API_KEY="your-api-key"
+   # Get your free API key at https://openrouter.ai/keys
+   export OPENROUTER_API_KEY="sk-or-v1-your-key-here"
    ```
+
+4. Run the demo:
+   ```bash
+   iex -S mix
+   # Then run the demo script
+   Code.eval_file("examples/demo.exs")
+   ```
+
+## Quick Start
+
+### Get your OpenRouter API Key
+
+1. Visit [https://openrouter.ai/keys](https://openrouter.ai/keys)
+2. Sign up for a free account
+3. Generate an API key (free tier includes $1 of credits)
+4. Export it: `export OPENROUTER_API_KEY="sk-or-v1-..."`
+
+### Run Your First Conversation
+
+```bash
+iex -S mix
+```
+
+```elixir
+# Start a conversation
+{:ok, conv_id} = ConcurrentAiChat.start_conversation()
+
+# Send a message
+{:ok, response} = ConcurrentAiChat.send_message(conv_id, "What is Elixir?")
+IO.puts(response)
+
+# Check the history
+history = ConcurrentAiChat.get_history(conv_id)
+```
+
+### Fast Models
+
+This project uses **DeepSeek** by default - one of the fastest and most cost-effective models on OpenRouter:
+
+- **DeepSeek Chat**: ~450 tokens/sec, extremely cheap ($0.14 per 1M tokens)
+- **Qwen QwQ 32B**: High throughput alternative
+- **Auto :nitro routing**: Automatically selects fastest available model
+
+To use a different model:
+
+```elixir
+ConcurrentAiChat.start_conversation(model: "qwen/qwen-2.5-72b-instruct")
+ConcurrentAiChat.start_conversation(model: "auto:nitro")  # Fastest routing
+```
 
 ## Usage
 
@@ -543,7 +595,8 @@ The beauty of this architecture: **Elixir processes handle AI conversations, Liv
 
 ## TODO
 
-- [ ] Integrate with actual AI API (OpenAI, Anthropic, etc.)
+- [x] Integrate with actual AI API (OpenRouter with DeepSeek)
+- [x] Create demo and examples
 - [ ] Add conversation persistence (database)
 - [ ] Implement conversation cleanup/timeout
 - [ ] Add metrics and observability (Telemetry)
@@ -553,6 +606,8 @@ The beauty of this architecture: **Elixir processes handle AI conversations, Liv
 - [ ] Add support for streaming responses
 - [ ] Create benchmarking suite
 - [ ] Multi-node deployment example
+- [ ] Add PubSub for real-time conversation updates
+- [ ] Implement conversation search/filtering
 
 ## Performance Characteristics
 
